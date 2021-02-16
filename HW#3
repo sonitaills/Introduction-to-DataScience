@@ -1,0 +1,181 @@
+## QUESTION 1
+import pandas as pd
+import numpy as np
+
+Energy = pd.read_excel("assets/Energy Indicators.xls",usecols =[2,3,4,5,6], header=17, skipfooter=38, na_values = ["..."])
+Energy.columns = ['Country','Energy Supply', 'Energy Supply per capita', '% Renewable']
+Energy['Energy Supply'] = Energy['Energy Supply'].apply(lambda x: x*(10**6))
+
+Energy ['Country'] = Energy ['Country'].replace(to_replace ='\d*', value = '', regex = True)
+Energy ['Country'] = Energy ['Country'].replace(to_replace ='[\s(]*[\w\s]*[)]', value = '', regex = True)
+
+Energy['Country'].replace({"Republic of Korea": "South Korea",
+                            "United States of America": "United States",
+                            "United Kingdom of Great Britain and Northern Ireland": "United Kingdom",
+                            "China, Hong Kong Special Administrative Region": "Hong Kong"}, inplace = True)
+Energy.set_index(['Country'], inplace = True)
+
+GDP = pd.read_csv("assets/world_bank.csv",header=4)
+GDP['Country Name'].replace({"Korea, Rep.": "South Korea", 
+                        "Iran, Islamic Rep.": "Iran",
+                        "Hong Kong SAR, China": "Hong Kong"}, inplace = True)
+
+GDP.set_index('Country Name',inplace = True)
+
+ScimEn = pd.read_excel("assets/scimagojr-3.xlsx")
+ScimEn.set_index('Country',inplace = True)
+ScimEn = ScimEn.head(15)
+
+merge1 = pd.merge(ScimEn,Energy, how='left', left_index = True, right_index = True)
+columns_to_be_merged = ['2006','2007','2008','2009','2010','2011','2012','2013','2014','2015']
+merge1 = pd.merge(merge1,GDP[columns_to_be_merged], how='left', left_index = True, right_index  =True )
+
+colummns_names_before = list(merge1.columns.values)
+columns_names_after = ['Rank', 'Documents', 'Citable documents', 'Citations', 'Self-citations', 'Citations per document', 'H index', 'Energy Supply', 'Energy Supply per Capita', '% Renewable', '2006', '2007', '2008', '2009', '2010', '2011', '2012', '2013', '2014', '2015']
+i=0
+dict_names = {}
+for before in colummns_names_before:
+    dict_names[before] = columns_names_after[i]
+    i+=1
+
+merge1.rename(columns = dict_names, inplace = True )
+
+#QUESTION 2
+Energy = pd.read_excel("assets/Energy Indicators.xls",usecols =[2,3,4,5,6], header=17, skipfooter=38, na_values = ["..."])
+Energy.columns = ['Country','Energy Supply', 'Energy Supply per capita', '% Renewable']
+Energy['Energy Supply'] = Energy['Energy Supply'].apply(lambda x: x*(10**6))
+
+Energy ['Country'] = Energy ['Country'].replace(to_replace ='\d*', value = '', regex = True)
+Energy ['Country'] = Energy ['Country'].replace(to_replace ='[\s(]*[\w\s]*[)]', value = '', regex = True)
+
+Energy['Country'].replace({"Republic of Korea": "South Korea",
+                            "United States of America": "United States",
+                            "United Kingdom of Great Britain and Northern Ireland": "United Kingdom",
+                            "China, Hong Kong Special Administrative Region": "Hong Kong"}, inplace = True)
+Energy.set_index(['Country'], inplace = True)
+
+GDP = pd.read_csv("assets/world_bank.csv",header=4)
+GDP['Country Name'].replace({"Korea, Rep.": "South Korea", 
+                        "Iran, Islamic Rep.": "Iran",
+                        "Hong Kong SAR, China": "Hong Kong"}, inplace = True)
+
+GDP.set_index('Country Name',inplace = True)
+
+ScimEn = pd.read_excel("assets/scimagojr-3.xlsx")
+ScimEn.set_index('Country',inplace = True)
+#ScimEn = ScimEn.head(15)
+
+full_outter_join = pd.merge(ScimEn,Energy, how='outer', left_index = True, right_index = True)
+full_outter_join = pd.merge(full_outter_join,GDP, how='outer', left_index = True, right_index = True)
+
+inner_join = pd.merge(ScimEn,Energy, how='inner', left_index = True, right_index = True)
+inner_join = pd.merge(inner_join,GDP, how='inner', left_index = True, right_index = True)
+
+print(len(full_outter_join) - len(inner_join))
+
+#QUESTION 3
+columns_to_be_merged = ['2006','2007','2008','2009','2010','2011','2012','2013','2014','2015']
+data = merge1[columns_to_be_merged].apply(lambda x: np.nanmean(x),axis=1)
+data= data.sort_values(ascending = False)
+data.head(15)
+
+#QUESTION 4
+merge1.loc['United Kingdom']['2015'] - merge1.loc['United Kingdom']['2006']
+
+#QUESTION 5
+merge1['Energy Supply per Capita'].agg(np.nanmean)
+
+#QUESTION 6
+max_renewable = merge1['% Renewable'].agg(np.max)
+country = merge1.where(merge1['% Renewable'] == max_renewable).dropna().index[0]
+print(country,max_renewable)
+
+#QUESTION 7
+merge1['Citation_ratio'] = merge1['Self-citations']/merge1['Citations']
+max_citation = merge1['Citation_ratio'].agg(np.max)
+citantion_country = merge1.where(merge1['Citation_ratio']==max_citation).dropna().index[0]
+print(citantion_country,max_citation)
+
+#QUESTION 8
+merge1['Pop_estimation'] = merge1['Energy Supply']/(merge1['Energy Supply per Capita'])
+merge1.sort_values(by=['Pop_estimation'],ascending = False).index[2]
+
+#QUESTION 9
+merge1['Citable_per_person'] = merge1['Citable documents'] / merge1['Pop_estimation']
+merge1[['Energy Supply per Capita', 'Citable_per_person']].corr(method = 'pearson').iloc[0][1]
+
+#QUESTION 10
+def above_below(row):
+    if row >= median_renewable:
+        return 1
+    elif row< median_renewable:
+        return 0
+
+median_renewable = merge1['% Renewable'].head(15).agg(np.median)
+merge1['HighRenew'] = merge1['% Renewable'].apply(above_below)
+merge1.sort_values(by=['Rank'])['HighRenew']
+
+#QUESTION 11
+ContinentDict  = {'China':'Asia', 
+                  'United States':'North America', 
+                  'Japan':'Asia', 
+                  'United Kingdom':'Europe', 
+                  'Russian Federation':'Europe', 
+                  'Canada':'North America', 
+                  'Germany':'Europe', 
+                  'India':'Asia',
+                  'France':'Europe', 
+                  'South Korea':'Asia', 
+                  'Italy':'Europe', 
+                  'Spain':'Europe', 
+                  'Iran':'Asia',
+                  'Australia':'Australia', 
+                  'Brazil':'South America'}
+
+
+data_set = merge1.groupby(ContinentDict).agg({'Pop_estimation':(['count', np.nansum,np.nanmean, np.nanstd])})
+column_names = ['size', 'sum', 'mean', 'std']
+
+data_set.columns = column_names
+
+#QUESTION 12
+Energy = pd.read_excel("assets/Energy Indicators.xls",usecols =[2,3,4,5,6], header=17, skipfooter=38, na_values = ["..."])
+Energy.columns = ['Country','Energy Supply', 'Energy Supply per capita', '% Renewable']
+Energy['Energy Supply'] = Energy['Energy Supply'].apply(lambda x: x*(10**6))
+
+Energy ['Country'] = Energy ['Country'].replace(to_replace ='\d*', value = '', regex = True)
+Energy ['Country'] = Energy ['Country'].replace(to_replace ='[\s(]*[\w\s]*[)]', value = '', regex = True)
+
+Energy['Country'].replace({"Republic of Korea": "South Korea",
+                            "United States of America": "United States",
+                            "United Kingdom of Great Britain and Northern Ireland": "United Kingdom",
+                            "China, Hong Kong Special Administrative Region": "Hong Kong"}, inplace = True)
+
+
+def return_continent(row):
+    continent_list =[]
+    row = list(row)
+    for count,values in enumerate(row):
+        if values in ContinentDict:
+            continent_list.append(ContinentDict[values])
+        else:
+            continent_list.append(0)
+    
+    return pd.Series(continent_list)
+    
+Energy['Continent'] = return_continent(Energy.Country)
+Energy = Energy[Energy['Continent']!=0]
+#Here we are cutting it into bins
+bins = pd.cut(Energy['% Renewable'],5)
+bins.cat.categories
+#Replaced the columns by the the bin value which each row belongs to
+Energy['% Renewable'] = pd.Categorical(bins)
+Energy['% Renewable'] = Energy['% Renewable'].cat.codes
+
+
+Energy = Energy.set_index(['Continent','% Renewable'])
+print(Energy.groupby(level = ['Continent','% Renewable']).size())
+
+#QUESTION 13
+merge1['PopEst'] =merge1['Pop_estimation'].apply(lambda x:'{:,}'.format(x))
+print(merge1[['PopEst','Pop_estimation']])
