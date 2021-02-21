@@ -1,0 +1,10 @@
+import pandas as pd
+import numpy as np
+
+reading_website = pd.read_html('assets/wikipedia_data.html')
+metro_regions = reading_website[1]
+metro_regions.drop(['B6','MLS','CFL'],axis=1,inplace=True)
+metro_regions = metro_regions.replace(to_replace ='\[[\w ]*\]', value = '', regex = True) 
+metro_regions = metro_regions.replace(to_replace ='[—]{1,5}', value = np.nan, regex = True) 
+metro_regions = metro_regions.replace(to_replace ='^\s*$', value = np.nan, regex = True) 
+metro_regions
