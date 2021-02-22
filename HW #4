@@ -103,3 +103,33 @@ r,p = stats.pearsonr(mlb_population, mlb_ratio)
 print('MLB r ={}'.format(r))
 r,p = stats.pearsonr(nhl_population, nhl_ratio)
 print('NHL r ={}'.format(r))
+
+
+dict_cities= {'NFL':nfl_region_team,
+             'NBA':nba_region_team,
+             'MLB':mlb_region_team,
+             'NHL':nhl_region_team}
+
+dict_ratios= {'NFL':nfl_ratio,
+             'NBA':nba_ratio,
+             'MLB':mlb_ratio,
+             'NHL':nhl_ratio}
+
+def sport_team_performance(l1,l2):
+    
+    l1_ratio = dict_ratios[l1]
+    l1_cities = dict_cities[l1]
+    l2_ratio = dict_ratios[l2]
+    l2_cities = dict_cities[l2]
+
+    df_1 = pd.DataFrame(l1_ratio,l1_cities.keys(),columns=['ratio_df1'])
+    df_2 = pd.DataFrame(l2_ratio,l2_cities.keys(),columns=['ratio_df2'])
+    joined = pd.merge(df_1,df_2,how='outer', left_index=True, right_index=True).dropna()
+    return stats.ttest_rel(joined['ratio_df1'],joined['ratio_df2'])[1]
+    
+p_values = pd.DataFrame({k:np.nan for k in sports}, index=sports)
+for item in sports:
+    for sub_item in sports:
+        p_values[item][sub_item] = sport_team_performance(item,sub_item)
+
+p_values
