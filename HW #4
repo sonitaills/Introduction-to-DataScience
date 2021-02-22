@@ -1,10 +1,105 @@
 import pandas as pd
 import numpy as np
+import re
+import string
 
-reading_website = pd.read_html('assets/wikipedia_data.html')
-metro_regions = reading_website[1]
-metro_regions.drop(['B6','MLS','CFL'],axis=1,inplace=True)
-metro_regions = metro_regions.replace(to_replace ='\[[\w ]*\]', value = '', regex = True) 
-metro_regions = metro_regions.replace(to_replace ='[—]{1,5}', value = np.nan, regex = True) 
-metro_regions = metro_regions.replace(to_replace ='^\s*$', value = np.nan, regex = True) 
-metro_regions
+#Function to separate all the teams by region
+#--------------------------------------------------------------------------------------------------------------
+def all_teams(data_frame,league):
+    subset = data_frame[['Metropolitan area',league]].dropna() 
+    
+    #Teams with multiple names will have two upper case letters, separeted by spaces!
+    #Multiple teams will have their names together without space;
+    #Ex: Golden Knights (only 1 team); GiantJets (2 teams)
+    
+    #Regex explained: Seaching for upper case letter, with lenght 1 and that is not preceeded by a number or upper case letter
+    separators = subset[league].apply(lambda x: re.findall("(?<![0-9A-Z\s])[0-9A-Z]{1,1}",x)) 
+    
+    #Regex: any upper case letter that is not preceeded by space or that is not in the beggining of the sentece
+    team_list = subset[league].apply(lambda x: re.split('(?<!^)(?<!\s)[A-Z]',x)) 
+    regions = subset['Metropolitan area']
+    for position, value in enumerate(separators): #For loop to fix team names
+        team_count = len(value)
+        if team_count>1:
+            for item in range(1,team_count): #First position always will return a correct match
+                team_list.iloc[position][item] = separators.iloc[position][item] + team_list.iloc[position][item]
+
+    region_team_dict = {}
+    for position,value in enumerate(regions):
+        #print(value,team_list.iloc[position])
+        region_team_dict[value] = team_list.iloc[position]
+    return region_team_dict
+#--------------------------------------------------------------------------------------------------------------
+#Function to calculate the win_loss_ratio of each city per league
+def win_loss_ratio(region_team,league):
+    ratio_dict ={}
+    population_dict = {}
+
+    for city in region_team:
+        ratio =0
+        number_teams = len(region_team[city])
+        
+        for team in region_team[city]:
+            subset = league[league['team'].str.contains(team)]
+            ratio +=  int(subset['W'])/(int(subset['W'])+int(subset['L']))
+        ratio = ratio/number_teams
+        ratio_dict[city] = ratio
+        
+        population_dict[city] = float(cities[cities['Metropolitan area'].eq(city)]['population'])
+    return list(ratio_dict.values()),list(population_dict.values())
+#--------------------------------------------------------------------------------------------------------------
+
+cities=pd.read_html("assets/wikipedia_data.html")[1]
+cities=cities.iloc[:-1,[0,3,5,6,7,8]]
+cities.rename(columns={'Population (2016 est.)[8]': 'population'},inplace = True)
+
+#Regex for white space is not being recognized. Why is that happening?
+replacements = {"^\s*$":np.nan,
+                '\[[\w ]*\]':'',
+               '[—]{1,5}':np.nan,
+               }
+                
+cities = cities.replace(replacements, regex = True) 
+#Line bellow only existis because regex for white space is not being recognized
+cities = cities.replace(to_replace ='^\s*$', value = np.nan, regex = True) 
+
+#--------------------------------------------------------------------
+#importing NFL data
+nfl = pd.read_csv('assets/nfl.csv',usecols=['W','L','W-L%','team','year'])
+nfl = nfl[nfl.year.eq(2018)]
+
+#importing NHL data
+nhl = pd.read_csv('assets/nhl.csv',usecols=['W','L','team','year'])
+nhl = nhl[nhl.year.eq(2018)]
+
+#importing MLB data
+mlb = pd.read_csv('assets/mlb.csv',usecols=['W','L','team','year'])
+mlb = mlb[mlb.year.eq(2018)]
+
+#importing NBA data
+nba = pd.read_csv('assets/nba.csv',usecols=['W','L','team','year'])
+nba = nba[nba.year.eq(2018)]
+
+#--------------------------------------------------------------------
+
+columns_of_iterest = ['Metropolitan area','NFL','MLB','NBA','NHL']
+nfl_region_team = all_teams(cities[columns_of_iterest],'NFL')
+nhl_region_team = all_teams(cities[columns_of_iterest],'NHL')
+mlb_region_team = all_teams(cities[columns_of_iterest],'MLB')
+nba_region_team = all_teams(cities[columns_of_iterest],'NBA')
+
+nfl_ratio,nfl_population= win_loss_ratio(nfl_region_team,nfl)
+nba_ratio,nba_population= win_loss_ratio(nba_region_team,nba)
+mlb_ratio,mlb_population= win_loss_ratio(mlb_region_team,mlb)
+nhl_ratio,nhl_population= win_loss_ratio(nhl_region_team,nhl)
+                                         
+
+import scipy.stats as stats
+r,p = stats.pearsonr(nba_population, nba_ratio)
+print('NBA r ={}'.format(r))
+r,p = stats.pearsonr(nfl_population, nfl_ratio)
+print('NFL r ={}'.format(r))
+r,p = stats.pearsonr(mlb_population, mlb_ratio)
+print('MLB r ={}'.format(r))
+r,p = stats.pearsonr(nhl_population, nhl_ratio)
+print('NHL r ={}'.format(r))
